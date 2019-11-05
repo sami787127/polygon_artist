@@ -14,6 +14,9 @@ ArrayList<Integer> colors = new ArrayList();
 final float PANEL_MARGIN= (-1.0+2.0/8.0+2.0/8.0);
 int selectedPolygon = -1;
 
+boolean mPressed = false;
+float prevX = -1, prevY = -1;
+
 void setup(){
   size(640, 640, P3D);
   ortho(-1, 1, 1, -1);
@@ -56,9 +59,24 @@ void draw(){
     drawLines();
     drawCircles();
   }
+ 
+  drawVertexCircle();
   
   
   mouseClicked = false;
+}
+
+void drawVertexCircle(){
+  if(selectedPolygon!=-1){
+    ArrayList<float[]> polygon = polygons.get(selectedPolygon);
+    for(int j= 0; j<polygon.size(); j++){
+      strokeWeight(1);
+      fill(0, 255 , 0);
+      stroke(0);
+      float[] center = polygon.get(j);
+      ellipse(center[0], center[1], CIRCLE_RADIUS, CIRCLE_RADIUS);
+    }
+  }
 }
 
 void colorPanel(float mPosX, float mPosY){
@@ -159,10 +177,11 @@ void drawCircles(){
   strokeWeight(1);
   fill(0, 255 , 0);
   stroke(0);
-  for(int i = 0; i<vertices.size(); i++){
-    float[] center = vertices.get(i);
+  if(!vertices.isEmpty()){
+    float[] center = vertices.get(0);
     ellipse(center[0], center[1], CIRCLE_RADIUS, CIRCLE_RADIUS);
   }
+  
 }
 
 void mouseClicked(){
@@ -234,16 +253,7 @@ void drawPolygons(){
       float[] point = polygon.get(0);
       vertex(point[0], point[1]);
       endShape();
-      if(i==selectedPolygon){
-        for(int j= 0; j<polygon.size(); j++){
-          
-          strokeWeight(1);
-          fill(0, 255 , 0);
-          stroke(0);
-          float[] center = polygon.get(j);
-          ellipse(center[0], center[1], CIRCLE_RADIUS, CIRCLE_RADIUS);
-        }
-      }
+
     }
   }
 }
@@ -251,7 +261,7 @@ void drawPolygons(){
 
 boolean checkPolygon(){
   if(!polygons.isEmpty()){
-      for(int i = 0; i<polygons.size(); i++){
+      for(int i = polygons.size()-1; i>=0; i--){
         ArrayList<float[]> polygon = polygons.get(i);
         int countCross = 0;
         for(int j = 0; j<polygon.size(); j ++){
@@ -302,4 +312,108 @@ boolean checkPolygon(){
   }
   
   return false;
+}
+
+void mouseDragged(){
+  mousePosX = 2.0*mouseX/640-1;
+  mousePosY = 1-2.0*mouseY/640;
+  //int selectedVertex = -1;
+  boolean mouseOnVertex = false;
+  if(selectedPolygon!=-1){
+    ArrayList<float[]> polygon = polygons.get(selectedPolygon);
+    
+    for(int i = 0; i<polygon.size(); i++){
+      float[] vertex = polygon.get(i);
+      if(sqrt( sq(vertex[0]-mousePosX) + sq(vertex[1]-mousePosY) ) <=CIRCLE_RADIUS){
+        polygon.remove(i);
+        polygon.add(i, new float[]{mousePosX, mousePosY});
+        mouseOnVertex = true;
+      }
+    }
+  }
+  
+  if(!mouseOnVertex){
+    //if(mPressed){
+      
+    //}
+    
+    float[] vector = {mousePosX-prevX, mousePosY-prevY};
+    ArrayList<float[]> polygon = polygons.get(selectedPolygon);
+    
+    for(int i = 0; i<polygon.size(); i++){
+      float[] vertex = polygon.get(i);
+      vertex[0] += vector[0];
+      vertex[1] += vector[1];
+    }
+    prevX = mousePosX;
+    prevY = mousePosY;
+  }
+
+  
+  redraw();
+}
+
+void mousePressed(){
+  mPressed = true;
+  mousePosX = 2.0*mouseX/640-1;
+  mousePosY = 1-2.0*mouseY/640;
+  if(isInside()){
+      prevX = mousePosX;
+      prevY = mousePosY;
+  }
+  
+}
+
+//void mouseReleased(){
+//  mPressed = false;
+//}
+
+
+
+
+boolean isInside(){
+  if(selectedPolygon!=-1){
+    ArrayList<float[]> polygon = polygons.get(selectedPolygon);
+    int countCross = 0;
+    for(int j = 0; j<polygon.size(); j ++){
+      //println(polygon.get(j));
+      float[] point1;
+      float[] point2;
+      if(j!=polygon.size()-1){
+        point1 = polygon.get(j);
+        point2 = polygon.get(j+1);
+      }
+      else{
+        point1 = polygon.get(j);
+        point2 = polygon.get(0);
+      }
+      float x3 = mousePosX;
+      //(((mousePosY+1.0)/2.0)*640.0)+0.5
+      float y3 = mousePosY;
+      float x4 = 1.0;
+      float y4 = y3;
+      //println("mouse"+" "+x3+","+y3+"  "+x4+","+y4);
+      float x1 = point1[0];
+      float y1 = point1[1];
+      float x2 = point2[0];
+      float y2 = point2[1];
+      //println("lines"+" "+x1+","+y1+"  "+x2+","+y2);
+      float ta = ( (x4-x3)*(y1-y3)-(y4-y3)*(x1-x3) )/( (y4-y3)*(x2-x1)-(x4-x3)*(y2-y1) );
+      float tb = ( (x2-x1)*(y1-y3)-(y2-y1)*(x1-x3) )/( (y4-y3)*(x2-x1)- (x4-x3)*(y2-y1) );
+            
+      if(ta>=0.0 && ta<=1.0 && tb>=0.0 && tb<=1.0){
+        if(y1<y3 && y2>y3){
+          countCross++;
+        }
+        else{
+          countCross--;
+        }
+      }
+    }
+    if(countCross!=0){
+      return true;
+    }
+  }
+  return false;
+  
 }
