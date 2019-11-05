@@ -14,9 +14,17 @@ ArrayList<Integer> colors = new ArrayList();
 final float PANEL_MARGIN= (-1.0+2.0/8.0+2.0/8.0);
 int selectedPolygon = -1;
 
+float unitLength = 0.2;
+float[] origin = {0,0}; 
+//float[] u = {1,0};
+//float[] v = {0,1};
+//float[] o = {0,0};
+ArrayList<float[]> matrices = new ArrayList();
+float[] xUnit = {0,0};
+float[] yUnit = {0,0};
 boolean mPressed = false;
 float prevX = -1, prevY = -1;
-
+boolean mousePressedOnUnit = false;
 void setup(){
   size(640, 640, P3D);
   ortho(-1, 1, 1, -1);
@@ -61,7 +69,9 @@ void draw(){
   }
  
   drawVertexCircle();
-  
+  if(selectedPolygon!=-1){
+    drawUnitCoord(origin);
+  }
   
   mouseClicked = false;
 }
@@ -73,8 +83,11 @@ void drawVertexCircle(){
       strokeWeight(1);
       fill(0, 255 , 0);
       stroke(0);
+      float[] matrix = matrices.get(selectedPolygon);
+      applyMatrix(matrix[0], matrix[1], matrix[2],matrix[3],matrix[4],matrix[5]);
       float[] center = polygon.get(j);
       ellipse(center[0], center[1], CIRCLE_RADIUS, CIRCLE_RADIUS);
+      resetMatrix();
     }
   }
 }
@@ -168,6 +181,7 @@ void setMode(){
        drawingMode = false;
        polygons.add(vertices);
        vertices = new ArrayList();
+       matrices.add(new float[]{1,0,0,0,1,0});
        colors.add(currColor);
      }
   }
@@ -231,6 +245,7 @@ void drawRubberLine(){
 }
 
 void drawPolygons(){
+  //printMatrix();
   if(!polygons.isEmpty()){
     for(int i =0; i<polygons.size(); i++){
       ArrayList<float[]> polygon = polygons.get(i);
@@ -238,11 +253,15 @@ void drawPolygons(){
       if(selectedPolygon!=-1 && i==selectedPolygon){
         stroke(0,0,255);
         strokeWeight(2);
+
       }
       else{
         stroke(255, 0 ,0);
         strokeWeight(1);
       }
+      float[] matrix = matrices.get(i);
+      applyMatrix(matrix[0], matrix[1], matrix[2],matrix[3],matrix[4],matrix[5]);
+      printMatrix();
       fill(colors.get(i));
       
       beginShape(POLYGON);
@@ -253,11 +272,42 @@ void drawPolygons(){
       float[] point = polygon.get(0);
       vertex(point[0], point[1]);
       endShape();
-
+      resetMatrix();
     }
   }
 }
 
+float[] getOrigin(ArrayList<float[]> polygon){
+  float sumX = 0.0;
+  float sumY = 0.0;
+  for(int i = 0; i<polygon.size(); i++){
+    float[] point = polygon.get(i);
+    sumX += point[0];
+    sumY += point[1];
+  }
+  
+  float x = sumX/polygon.size();
+  float y = sumY/polygon.size();
+  
+  return new float[]{x,y};
+}
+
+void drawUnitCoord(float[] origin){
+  stroke(255,0,0);
+  strokeWeight(2);
+  beginShape(LINES);
+  vertex(origin[0], origin[1]);
+  vertex(xUnit[0], xUnit[1]);
+  vertex(origin[0], origin[1]);
+  vertex(yUnit[0], yUnit[1]);
+  endShape();
+  
+  strokeWeight(1);
+  
+  fill(200, 200, 0);
+  ellipse(xUnit[0], xUnit[1], CIRCLE_RADIUS, CIRCLE_RADIUS);
+  ellipse(yUnit[0], yUnit[1], CIRCLE_RADIUS, CIRCLE_RADIUS);
+}
 
 boolean checkPolygon(){
   if(!polygons.isEmpty()){
@@ -305,6 +355,9 @@ boolean checkPolygon(){
         }
         if(countCross!=0){
             selectedPolygon = i;
+            origin = getOrigin(polygon);
+            xUnit = new float[]{origin[0]+unitLength, origin[1]};
+            yUnit = new float[]{origin[0], origin[1]+unitLength};
             return true;
         }
       }
@@ -330,23 +383,57 @@ void mouseDragged(){
         mouseOnVertex = true;
       }
     }
+    
+    
+    if(sqrt( sq(xUnit[0]-mousePosX) + sq(xUnit[1]-mousePosY) ) <=CIRCLE_RADIUS){
+      float[] matrix = matrices.get(selectedPolygon);
+      matrix[0] += (mousePosX-xUnit[0])/unitLength;
+      xUnit[0] = mousePosX;
+        
+      matrix[3] += (mousePosY-xUnit[1])/unitLength;
+      xUnit[1] = mousePosY;
+      
+      mouseOnVertex = true;
+    }
+    else if(sqrt( sq(yUnit[0]-mousePosX) + sq(yUnit[1]-mousePosY) ) <=CIRCLE_RADIUS){
+      float[] matrix = matrices.get(selectedPolygon);
+      matrix[1] += (mousePosX-yUnit[0])/unitLength;
+      yUnit[0] = mousePosX;
+      matrix[4] += (mousePosY-yUnit[1])/unitLength;
+      yUnit[1] = mousePosY;
+      mouseOnVertex = true;
+    }
+
   }
   
-  if(!mouseOnVertex){
+  if(!mouseOnVertex && !mousePressedOnUnit){
     //if(mPressed){
       
     //}
-    
-    float[] vector = {mousePosX-prevX, mousePosY-prevY};
-    ArrayList<float[]> polygon = polygons.get(selectedPolygon);
-    
-    for(int i = 0; i<polygon.size(); i++){
-      float[] vertex = polygon.get(i);
-      vertex[0] += vector[0];
-      vertex[1] += vector[1];
+    if(selectedPolygon!=-1){
+      float[] vector = {mousePosX-prevX, mousePosY-prevY};
+      ArrayList<float[]> polygon = polygons.get(selectedPolygon);
+      
+      for(int i = 0; i<polygon.size(); i++){
+        float[] vertex = polygon.get(i);
+        vertex[0] += vector[0];
+        vertex[1] += vector[1];
+      }
+      
+      origin[0] += vector[0];
+      origin[1] += vector[1];
+      xUnit[0] += vector[0];
+      
+      xUnit[1] += vector[1];
+      
+      yUnit[0] += vector[0];
+      yUnit[1] += vector[1];
+      prevX = mousePosX;
+      prevY = mousePosY;
+      
+      //matrices.remove(selectedPolygon);
+      //matrices.add(selectedPolygon, matrix);
     }
-    prevX = mousePosX;
-    prevY = mousePosY;
   }
 
   
@@ -361,12 +448,22 @@ void mousePressed(){
       prevX = mousePosX;
       prevY = mousePosY;
   }
+  if(sqrt( sq(xUnit[0]-mousePosX) + sq(xUnit[1]-mousePosY) ) <=CIRCLE_RADIUS){
+        xUnit[0] = mousePosX;
+        xUnit[1] = mousePosY;
+        mousePressedOnUnit = true;
+    }
+    else if(sqrt( sq(yUnit[0]-mousePosX) + sq(yUnit[1]-mousePosY) ) <=CIRCLE_RADIUS){
+        yUnit[0] = mousePosX;
+        yUnit[1] = mousePosY;
+        mousePressedOnUnit = true;
+    }
   
 }
 
-//void mouseReleased(){
-//  mPressed = false;
-//}
+void mouseReleased(){
+  mousePressedOnUnit = false;
+}
 
 
 
@@ -416,4 +513,87 @@ boolean isInside(){
   }
   return false;
   
+}
+
+void keyPressed(){
+  if(key=='q'){
+    if(selectedPolygon!=-1){
+      matrices.remove(selectedPolygon);
+      matrices.add(selectedPolygon, new float[]{1,0,0,0,1,0});
+      xUnit = new float[]{origin[0]+unitLength, origin[1]};
+      yUnit = new float[]{origin[0], origin[1]+unitLength};
+      redraw();
+    }
+  }
+  else if(key == 'w'){
+    for(int i = 0; i<matrices.size(); i++){
+      float[] matrix = matrices.get(i);
+      matrix[5] += 0.1;
+      
+    }
+    redraw();
+  }
+  
+  else if(key=='a'){
+   for(int i = 0; i<matrices.size(); i++){
+     float[] matrix = matrices.get(i);
+      matrix[2] -= 0.1;
+      
+    }
+    redraw();
+  }
+  
+  else if(key=='s'){
+   for(int i = 0; i<matrices.size(); i++){
+     float[] matrix = matrices.get(i);
+     matrix[5] -= 0.1;
+      
+   }
+
+   redraw();
+    
+  }
+  else if(key=='d'){
+   for(int i = 0; i<matrices.size(); i++){
+     float[] matrix = matrices.get(i);
+      matrix[2] += 0.1;
+      
+    }
+    redraw();
+  }
+  
+  else if(key == 'z'){
+    for(int i = 0; i<matrices.size(); i++){
+     float[] matrix = matrices.get(i);
+      matrix[0] *= 1.1;
+      matrix[1] *= 1.1;
+      matrix[3] *= 1.1;
+      matrix[4] *= 1.1;
+      
+    }
+    
+    redraw();
+  }
+  
+  else if(key =='c'){
+        for(int i = 0; i<matrices.size(); i++){
+     float[] matrix = matrices.get(i);
+      matrix[0] *= 0.9;
+      matrix[1] *= 0.9;
+      matrix[3] *= 0.9;
+      matrix[4] *= 0.9;
+      
+    }
+    
+    redraw();
+  }
+  
+  else if(key == 'x'){
+    for(int i = 0; i<matrices.size(); i++){
+      matrices.remove(i);
+      matrices.add(i, new float[]{1,0,0,0,1,0});
+      
+    }
+    redraw();
+  }
 }
